@@ -1,0 +1,59 @@
+
+https://wcc.sc.egov.usda.gov/reportGenerator/
+
+roughly approximate the region of the sierra nevada*
+    - [all stations] in CA, stations in the carson range spur in NV
+        https://en.wikipedia.org/wiki/Sierra_Nevada_(U.S.)#/media/File:Sierra_Nevada_map.png
+        https://sierranevada.ca.gov/snwatershed-d1/
+        https://water.usgs.gov/wsc/reg/18.html
+    *for simplicity re: exporting data, decided to use all of CA instead of subselecting all the sierra-specific watersheds
+
+        "Unlike the main crest of the Sierra Nevada to the west of Lake Tahoe, 
+        the Carson Range loses its snow much earlier (April), and gains it much 
+        later (December). In fact, it receives about half the snowfall as 
+        mountains west of the lake."
+
+        the carson range is essentially the eastern side of lake tahoe, stretching between carson valley north to reno
+            https://www.usgs.gov/media/images/map-nevada-basin-and-range-nawqa-study-unit-showing-land-use
+            https://services.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/9/195/85
+
+        Watershed map
+        https://water.usgs.gov/wsc/map_index.html
+            Great Basin, https://water.usgs.gov/wsc/reg/16.html
+            Central Lahontan (1605), https://water.usgs.gov/wsc/sub/1605.html
+            Truckee (160501), https://water.usgs.gov/wsc/acc/160501.html
+            Lake Tahoe (16050101) and Truckee (16050102)
+
+    Metadata --------
+    Station Id
+    Station Name
+    State Code
+    Elevation
+    Latitude
+    Longitude
+
+    Data -------------
+    air temperature observed
+    air temperature average
+    reservoir storage volume
+    precipitation accumulation
+    snow depth
+    snow density
+    snow water equivalent
+    snow rain ratio
+
+    + run in three reports
+        + california
+        + HUC 16050101
+        + HUC 16050102
+    + stacked time series, monthly
+        + 2014-04-01,2019-03-31     [modify the date string in the URL below]
+        - export is fragile (timeout), collect one year at a time (for CA, at least)
+        - dont know for sure (yet) if the date boundaries are inclusive (i expect they are)
+
+    by state:
+    https://wcc.sc.egov.usda.gov/reportGenerator/view_csv/customMultipleStationReport,metric/monthly/start_of_period/state=%22CA%22%20AND%20outServiceDate=%222100-01-01%22%7Cname/2018-04-01,2019-03-31/stationId,name,state.code,elevation,latitude,longitude,TOBS::value,TAVG::value,RESC::value,PREC::value,SNWD::value,SNDN::value,WTEQ::value,SNRR::value?fitToScreen=false
+
+    by HUC:
+    https://wcc.sc.egov.usda.gov/reportGenerator/view_csv/customMultipleStationReport,metric/monthly/start_of_period/huc=%2216050101*%22%20AND%20outServiceDate=%222100-01-01%22%7Cname/2018-04-01,2019-03-31/stationId,name,state.code,elevation,latitude,longitude,TOBS::value,TAVG::value,RESC::value,PREC::value,SNWD::value,SNDN::value,WTEQ::value,SNRR::value?fitToScreen=false
+
