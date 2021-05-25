@@ -1,17 +1,18 @@
 import copy
-from datetime import datetime as dt
 import pandas as pd 
 # import http  # will lean on pd.read_csv instead
-import pyarango as pyAr
+import pyArango as pyAr
+from time import sleep
 
 # https://en.wikipedia.org/wiki/Droughts_in_California
 # https://upload.wikimedia.org/wikipedia/commons/1/1c/Drought_area_in_California.svg
 
 RANGE_SLICE_MONTHS = 12         # maximum window size per request
 DATE_RANGE = [                  # boundaries are inclusive
-    dt.datetime(2017, 4, 1),    # end of prior drought
-    dt.datetime(2021, 5, 16)    # today; inc 2018 and ongoing 2020 drought
+    pd.Timestamp(2017, 4, 1),   # end of prior drought
+    pd.Timestamp(2021, 5, 16)   # today; inc 2018 and ongoing 2020 drought
 ]
+REQ_SLEEP           = 5         # seconds between requests to the WCIS server
 
 REQUEST_COLS = [
     "stationId",
@@ -51,6 +52,7 @@ COLUMN_NAME_MAP = {
 def load_from_web():
     for req_args in define_requests():
         load_raw(req_args) 
+        sleep(REQ_SLEEP)
 
     return True
 
@@ -80,17 +82,17 @@ def new_requests(region_type, region, date_range):
 
         r = copy.copy(req)
         r['date_range'] = [floor, ceil]
-        reqs.push(r)
+        reqs.append(r)
 
     return reqs
 
 def load_raw(args, do_write_to_db = True):
     url = make_url(args)
 
-    print("requesting:", args['region'], date_range_str(args['date_range']),  "... ", end = "")
+    print("requesting:", args['region'], date_range_str(args['date_range']),  "... ", end = "", flush = True)
     df = pd.read_csv(url, 
-            comment = "#",
-            parse_dates = ['Date']
+            comment = "#"
+            # parse_dates = ['Date']
         ).rename(
             columns = COLUMN_NAME_MAP
         )
@@ -98,11 +100,11 @@ def load_raw(args, do_write_to_db = True):
     df = maybe_filter_ca(args, df)
 
     if do_write_to_db:
-        print("writing ... ", end = "")
+        print("writing ... ", end = "", flush = True)
         write_to_db(df)
 
-    print("done.")
-    return True
+    print("done.", flush = True)
+    return df
 
 def maybe_filter_ca(args, df):
     if args["region_type"] != "state" or args["region"] != "CA":
@@ -130,7 +132,7 @@ def make_url(args):
         region_str,
         "%20AND%20outServiceDate=%222100-01-01%22",
         "%7Cname/", 
-        date_str,
+        date_str, "/",
         col_str,
         "?fitToScreen=false"
     ])
