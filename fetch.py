@@ -1,8 +1,9 @@
 import copy
 import pandas as pd 
 # import http  # will lean on pd.read_csv instead
-import pyArango as pyAr
+import pyArango as pr
 from time import sleep
+from getpass import getpass
 
 # https://en.wikipedia.org/wiki/Droughts_in_California
 # https://upload.wikimedia.org/wikipedia/commons/1/1c/Drought_area_in_California.svg
@@ -49,12 +50,28 @@ COLUMN_NAME_MAP = {
     'Snow Rain Ratio (unitless)':                               'snow_rain_ratio'
 }
 
+DB_NAME         = "sierra"
+DB_USER         = "sierra"
+COLL_STATIONS   = "stations"
+COLL_OBS        = "observations"
+
 def load_from_web():
+    c   = make_conn(DB_USER)
+    db  = maybe_create_db(c, DB_NAME)
+    maybe_create_collection(db, COLL_STATIONS)
+    maybe_create_collection(db, COLL_OBS)
+    db.reloadCollections()
+
     for req_args in define_requests():
-        load_raw(req_args) 
+        r = load_raw(req_args) 
+        write_slice_to_db(db, r)
         sleep(REQ_SLEEP)
 
+    c.disconnectSession()   # oddly, this method is not documented
     return True
+
+
+# WCIS interactions --------
 
 def define_requests(date_range = DATE_RANGE):
     requests = []
@@ -86,7 +103,7 @@ def new_requests(region_type, region, date_range):
 
     return reqs
 
-def load_raw(args, do_write_to_db = True):
+def load_raw(args):
     url = make_url(args)
 
     print("requesting:", args['region'], date_range_str(args['date_range']),  "... ", end = "", flush = True)
@@ -98,10 +115,6 @@ def load_raw(args, do_write_to_db = True):
         )
 
     df = maybe_filter_ca(args, df)
-
-    if do_write_to_db:
-        print("writing ... ", end = "", flush = True)
-        write_to_db(df)
 
     print("done.", flush = True)
     return df
@@ -137,5 +150,43 @@ def make_url(args):
         "?fitToScreen=false"
     ])
 
-def write_to_db(df):
-    return
+
+# DB interactions ----------
+
+def make_conn(user):
+    return pr.connection.Connection(username = user, password = getpass())
+
+def maybe_create_db(conn):
+    if conn.hasDatabase(DB_NAME):
+        return conn[DB_NAME]
+    return conn.createDatabase(DB_NAME) 
+
+def maybe_create_collection(db, collection_name):
+    if db.hasCollection(collection_name):
+        return db[collection_name]
+    return db.createCollection(name = collection_name)
+
+def write_slice_to_db(db, df):
+    # future note: there's pr.Collection.bulkImport_* (from a file) and pr.Collection.bulkSave()
+    for row in df.itertuples(name = "obs", index = False):
+        write_doc_to_db(db, row)
+
+    return True
+
+def write_doc_to_db(db, row):
+    s_doc = maybe_create_station_doc(db, row)
+
+
+
+    return True
+
+def maybe_create_station_doc(db, row):
+    # if the stations collection contains this station already
+    d = db[COLL_STATIONS].fetchDocument(row.station_id)
+    if d:
+        return d
+
+    # create the doc
+    # add the selective cols
+    # save the doc
+    return d
