@@ -50,17 +50,15 @@ COLUMN_NAME_MAP = {
     'Snow Rain Ratio (unitless)':                               'snow_rain_ratio'
 }
 
-DB_NAME         = "sierra"
-DB_USER         = "sierra"
-COLL_STATIONS   = "stations"
-COLL_OBS        = "observations"
+DB_NAME          = "sierra"
+DB_USER          = "sierra"
+COLL_STATIONS    = "stations"
+COLL_OBS         = "observation_data"
+COLL_EDGE        = "observation_edges"
+
 
 def load_from_web():
-    c   = make_conn(DB_USER)
-    db  = maybe_create_db(c, DB_NAME)
-    maybe_create_collection(db, COLL_STATIONS)
-    maybe_create_collection(db, COLL_OBS)
-    db.reloadCollections()
+    c, db = db_init()
 
     for req_args in define_requests():
         r = load_raw(req_args) 
@@ -153,6 +151,16 @@ def make_url(args):
 
 # DB interactions ----------
 
+def db_init():
+    c   = make_conn(DB_USER)
+    db  = maybe_create_db(c, DB_NAME)
+    maybe_create_collection(db, COLL_STATIONS)
+    maybe_create_collection(db, COLL_OBS)
+    maybe_create_collection(db, COLL_EDGE)
+    db.reloadCollections()
+
+    return (c, db)
+
 def make_conn(user):
     return pr.connection.Connection(username = user, password = getpass())
 
@@ -168,7 +176,7 @@ def maybe_create_collection(db, collection_name):
 
 def write_slice_to_db(db, df):
     # future note: there's pr.Collection.bulkImport_* (from a file) and pr.Collection.bulkSave()
-    for row in df.itertuples(name = "obs", index = False):
+    for row in df.itertuples(index = False):
         write_doc_to_db(db, row)
 
     return True
@@ -176,17 +184,40 @@ def write_slice_to_db(db, df):
 def write_doc_to_db(db, row):
     s_doc = maybe_create_station_doc(db, row)
 
+    o_doc = db[COLL_OBS].createDocument()
+    o_doc.set({
+        'air_temp_obs_c':           row.air_temp_obs_c,
+        'air_temp_avg_c':           row.air_temp_avg_c,
+        'reservoir_volume_dam3':    row.reservoir_volume_dam3,
+        'precipitation_mm':         row.precipitation_mm,
+        'snow_depth_cm':            row.snow_depth_cm,
+        'snow_density_pct':         row.snow_density_pct,
+        'snow_water_equiv_mm':      row.snow_water_equiv_mm,
+        'snow_rain_ratio':          row.snow_rain_ratio
+    })
+    o_doc.save()
 
+    edge = db[COLL_EDGE].createEdge()
+    edge.links(o_doc, s_doc)    # _to_ the station
+    edge['date'] = row.date
+    edge.save()
 
     return True
 
 def maybe_create_station_doc(db, row):
-    # if the stations collection contains this station already
-    d = db[COLL_STATIONS].fetchDocument(row.station_id)
-    if d:
-        return d
+    s_doc = db[COLL_STATIONS].fetchDocument(row.station_id)
+    if s_doc:
+        return s_doc
 
-    # create the doc
-    # add the selective cols
-    # save the doc
-    return d
+    s_doc = db[COLL_STATIONS].createDocument()
+    s_doc.set({
+        'station_id':       row.station_id,
+        'station_name':     row.station_name,
+        'state':            row.state,
+        'elevation_ft':     row.elevation_ft,
+        'latitude':         row.latitude,
+        'longitude':        row.longitude
+    })
+    s_doc.save()
+
+    return s_doc
