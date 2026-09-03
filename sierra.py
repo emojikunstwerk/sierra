@@ -7,8 +7,9 @@ python3 -m pip install python-rtmidi
 
 from midi import Device
 from midi import DeviceNotActive
+from midi import NoteManager
 import pandas as pd
-import time     # time.sleep(s)
+import time
 import logging
 import sys
 
@@ -72,6 +73,8 @@ def load_data():
         data = pd.read_csv("sierra-prep.csv")
 
 def send_midi(note, velocity, note_dur, cc, cc_val):
+    # send CC data ...
+
     pass
 
 def station_to_midi(station_row):
@@ -87,6 +90,8 @@ def station_to_midi(station_row):
 
 
 def start(longitude_group, elev_rest = elev_rest):
+
+    score = NoteManager("sierra", tammy)
 
     voice_data = data.query(f'longitude_group == {longitude_group}')
     log.info(f'Loaded longitude_group {longitude_group} ({len(voice_data)} obs)')
@@ -111,11 +116,16 @@ def start(longitude_group, elev_rest = elev_rest):
             if (next_station_i <= (section_n - 1) and 
                 section.iloc[next_station_i].elevation_ft >= elev_playhead):
                 
-                send_midi( **station_to_midi( section.iloc[next_station_i] ) )
+                ev = station_to_midi( section.iloc[next_station_i] )
+                # do CC stuff
+                score.sound_note(ev['note'], ev['velocity'], ev['note_dur'])
+
                 next_station_i = next_station_i + 1
 
             time.sleep(elev_rest / 1000)
+            score.elapse_events(time.time())
 
+        score.wipe_off()    # just in case
         log.info('Resting between years...')
         time.sleep(section_rest / 1000)
 

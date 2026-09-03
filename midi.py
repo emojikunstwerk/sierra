@@ -56,5 +56,37 @@ class Device():
             log.debug(f"killed note {str(note)}")
 
 class NoteManager():
-    pass
+    """
+    a very simple abstraction for keeping track of how long notes should
+    be sounding. NoteManagers do not have their own clock – they keep
+    track of what events should happen when, and wait for a parent
+    process to ask them when it is time to worry about what should be
+    happening (and what NOTE OFFs need to be sent accordingly).
 
+    In the current setup, NoteManagers are device-specific.
+    """
+    def __init__(self, name, device):
+        self.name   = name
+        self.device = device
+        self.score  = {}
+
+    def sound_note(self, note, velocity, duration):
+        time_end = time.time() + duration
+        self.score[note] = time_end     # we may be updating the note-off time for an already-sounding note
+        self.device.on(note, velocity)
+
+    def elapse_events(self, time_now):
+        """ 
+        figure out which events should have happened by `time_now`, trigger
+        them, and clean up the `score` accordingly
+        """
+        elapsed_events = [ note for note, expiry in self.score.items() if expiry <= time_now ]
+
+        for note in elapsed_events:
+            self.device.off(note)
+            del self.score[note]
+
+    def wipe_off(self):
+        """ send NOTE OFFs for any still-sounding notes, regardless of the time """
+        for note in self.score.keys():
+            self.device.off(note)
