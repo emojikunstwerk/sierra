@@ -44,6 +44,7 @@ class Device():
             log.debug(f"note {str(note)} not active")
 
     def tap(self, note, sec_f, velocity = 64):
+        """ useful for testing and playing – only supports one note sounding at a time """
         self.on(note = note, velocity = velocity)
         time.sleep(sec_f)
         self.off(note = note)
@@ -70,16 +71,20 @@ class NoteManager():
         self.device = device
         self.score  = {}
 
-    def sound_note(self, note, velocity, duration):
-        time_end = time.time() + duration
+    def sound_note(self, note, velocity, duration_s):
+        time_end = time.time() + duration_s
         self.score[note] = time_end     # we may be updating the note-off time for an already-sounding note
         self.device.on(note, velocity)
 
-    def elapse_events(self, time_now):
+    def elapse_events(self, time_now = None):
         """ 
         figure out which events should have happened by `time_now`, trigger
-        them, and clean up the `score` accordingly
+        them, and clean up the `score` accordingly. If no specific time
+        is supplied, use the current time.
         """
+        if time_now is None:
+            time_now = time.time()
+
         elapsed_events = [ note for note, expiry in self.score.items() if expiry <= time_now ]
 
         for note in elapsed_events:
