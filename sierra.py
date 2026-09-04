@@ -16,6 +16,7 @@ import sys
 log   = None    # log instance 
 tammy = None    # mido device port will be stored here
 data  = None    # processed snotel data will be stored here
+rep   = None    # properties characterizing map from `data` to MIDI range, ie, the representation
 
 elev_rest           = 5         # ms, step time between feet of elevation
 section_rest        = 4000      # ms, rest time between sections
@@ -28,10 +29,11 @@ notes = {   # note @ lowest permitted octave (to simplify metric mapping)
     'G':    43,
     'A':    45 
 }
-octave_step = 12
-octave_range = [0, 5]
+octave_step = 12        # notes per octave
+octave_range = [0, 5]   # data map should span X octaves
 
-note_dur_range = [750, 1000 * 10]    # ms
+note_duration_range = [750, 1000 * 15]    # ms
+note_velocity_range = [32, 127]
 
 def setup(debug = True):
     global log
@@ -50,6 +52,7 @@ def setup(debug = True):
     log = logging.getLogger('sierra')
 
     load_data()
+    make_map()
     connect_tammy()
 
 def connect_tammy(dev_name = None):
@@ -72,22 +75,92 @@ def load_data():
     if data is None:
         data = pd.read_csv("sierra-prep.csv")
 
-def send_midi(note, velocity, note_dur, cc, cc_val):
-    # send CC data ...
+def make_map():
+    global rep 
 
-    pass
+    palette = make_note_palette()
 
-def station_to_midi(station_row):
-    log.debug(f'\n{station_row}')
+    rep = {
+        'note_palette': palette,
+        'note_n':       len(palette),
 
-    return {
-        'note':     station_row.water_mm_sum, 
-        'velocity': station_row.water_mm_sum, 
-        'note_dur': station_row.water_mm_sum,
-        'cc':       '64',                       # fixed for now
-        'cc_val':   station_row.temp_c_med
+        'water_min':    data['water_mm_sum'].min(),
+        'water_max':    data['water_mm_sum'].max(),
+
+        'temp_min':     data['temp_c_med'].min(),
+        'temp_max':     data['temp_c_med'].max()
     }
 
+    rep.update({
+        'water_delta':      rep['water_max'] - rep['water_min'],
+        'temp_delta':       rep['temp_max']  - rep['temp_min'],
+        'duration_delta':   note_duration_range[1] - note_duration_range[0],
+        'velocity_delta':   note_velocity_range[1] - note_velocity_range[0]
+    })
+
+def make_note_palette():
+    """
+    the scale is arbitrary, and the octave range is constrainted. this
+    function pre-generates an ordered set of allowed notes, the indexes
+    of which are the targets of a data column map
+    """
+    palette = []
+
+    for note in notes:
+        for octave_i in range(octave_range[0], octave_range[1]):
+            palette.append(note + (octave_i * octave_step))
+
+    palette.sort()
+
+def station_to_midi(st):
+    """ 
+    the logic to map the observation values to synthesizer parameters.
+    this is arbitrary, experimental, expressing, and the entire point.
+    """
+    log.debug(f'\n{st}')
+
+
+    # the nominal, direct maps
+    note_i = int(
+        (rep['water_delta'] -                           # invert
+            (st.water_mm_sum - rep['water_min']) ) /    # offset
+        rep['water_delta'] *                            # unit normalize
+        rep['note_n']                                   # expand (map to palette)
+    )
+
+    cc_val = int(
+        (st.temp_c_med - rep['temp_min']) /         # offset
+        rep['temp_delta'] *                         # unit normalize
+        127                                         # expand (CC range)
+    )
+
+    # correlate other sounding properties to the note
+    velocity = int(
+        (rep['note_n'] - rep['note_i']) /   # invert
+        rep['note_n'] *                     # unit normalize
+        rep['velocity_delta'] +             # scale
+        note_velocity_range[0]              # offset
+    )
+    dur = int(
+        (rep['note_n'] - rep['note_i']) /   # invert
+        rep['note_n'] *                     # unit normalize
+        rep['duration_delta'] +             # scale
+        note_duration_range[0]              # offset
+    )
+
+
+    output_values = {
+        'note':     rep['note_palette'][ note_i ], 
+        'velocity': velocity, 
+        'note_dur': dur,
+
+        'cc':       '64',                       # fixed parameter
+        'cc_val':   cc_val
+    }
+
+    log.debug(output_values)
+
+    return output_values
 
 def start(longitude_group, elev_rest = elev_rest):
 
@@ -132,4 +205,4 @@ def start(longitude_group, elev_rest = elev_rest):
     log.info(f'Completed run (longitude_group {longitude_group})')
 
 # setup()
-print('Call setup() to get started (sierra.log debug mode on by default)')
+print('Call setup() [sierra.log debug mode on by default], then start(longitude_group)')
