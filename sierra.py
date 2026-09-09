@@ -40,6 +40,9 @@ octave_range = [0, 5]   # data map should span X octaves
 note_duration_range = [750, 1000 * 15]    # ms
 note_velocity_range = [7, 127]
 
+year_range = [2014, 2019]
+
+
 def setup(debug = True, dev_name = None):
     global log
 
@@ -178,7 +181,7 @@ def start(longitude_group, elev_rest = elev_rest):
     voice_data = data.query(f'longitude_group == {longitude_group}')
     log.info(f'Loaded longitude_group {longitude_group} ({len(voice_data)} obs)')
 
-    for year in ['2014', '2015', '2016', '2017', '2018', '2019']:
+    for year in range(year_range[0], year_range[1], 1):
 
         section = voice_data.query(f'year == {year}')
         section_n = len(section)

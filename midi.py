@@ -8,6 +8,9 @@ import atexit
 log = logging.getLogger('midi')
 
 
+msg_breather_s = 0.05       # throttle messages sent at the "same" time
+
+
 class DeviceNotActive(Exception): pass
 
 class Device():
@@ -53,7 +56,7 @@ class Device():
         to_kill = self.active.copy()
         for note in to_kill:
             self.off(note = note)
-            time.sleep(0.05)
+            time.sleep(msg_breather_s)
             log.debug(f"killed note {str(note)}")
 
 class NoteManager():
@@ -77,7 +80,7 @@ class NoteManager():
         # only update the OFF time if it should be _extended_. This is a design
         # choice, but conceivably there will be uses for which we'd want to
         # shorten a note's life instead (will worry about that later).
-        if time_end > self.score[note]:
+        if self.score.get(note) is None or time_end > self.score[note]:
             self.score[note] = time_end
         
         self.device.on(note, velocity)
@@ -96,8 +99,13 @@ class NoteManager():
         for note in elapsed_events:
             self.device.off(note)
             del self.score[note]
+            time.sleep(msg_breather_s)
 
     def wipe_off(self):
         """ send NOTE OFFs for any still-sounding notes, regardless of the time """
+        log.debug(f"NoteManager {self.name} wipe_off ({len(self.score)} notes)")
+
         for note in self.score.keys():
             self.device.off(note)
+            del self.score[note]
+            time.sleep(msg_breather_s)
