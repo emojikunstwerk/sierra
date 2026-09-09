@@ -3,11 +3,16 @@ conda create -n sierra pandas python=3.14
 conda activate sierra
 python3 -m pip install mido
 python3 -m pip install python-rtmidi
+
+
+conda activate sierra
+python -i sierra.py
 """
 
 from midi import Device
 from midi import DeviceNotActive
 from midi import NoteManager
+from midi import mido
 import pandas as pd
 import time
 import logging
@@ -33,9 +38,9 @@ octave_step = 12        # notes per octave
 octave_range = [0, 5]   # data map should span X octaves
 
 note_duration_range = [750, 1000 * 15]    # ms
-note_velocity_range = [32, 127]
+note_velocity_range = [7, 127]
 
-def setup(debug = True):
+def setup(debug = True, dev_name = None):
     global log
 
     handler_console = logging.StreamHandler(sys.stdout)
@@ -50,10 +55,11 @@ def setup(debug = True):
     )
 
     log = logging.getLogger('sierra')
+    log.info('\n\n\nNew session\n')
 
     load_data()
     make_map()
-    connect_tammy()
+    connect_tammy(dev_name)
 
 def connect_tammy(dev_name = None):
     global tammy
@@ -106,11 +112,14 @@ def make_note_palette():
     """
     palette = []
 
-    for note in notes:
+    for note in notes.values():
         for octave_i in range(octave_range[0], octave_range[1]):
-            palette.append(note + (octave_i * octave_step))
+            nt = note + (octave_i * octave_step)
+            palette.append(nt)
 
     palette.sort()
+
+    return palette
 
 def station_to_midi(st):
     """ 
@@ -125,7 +134,7 @@ def station_to_midi(st):
         (rep['water_delta'] -                           # invert
             (st.water_mm_sum - rep['water_min']) ) /    # offset
         rep['water_delta'] *                            # unit normalize
-        rep['note_n']                                   # expand (map to palette)
+        rep['note_n'] - 1                               # expand (map to palette)
     )
 
     cc_val = int(
@@ -136,13 +145,13 @@ def station_to_midi(st):
 
     # correlate other sounding properties to the note
     velocity = int(
-        (rep['note_n'] - rep['note_i']) /   # invert
+        (rep['note_n'] - (note_i + 1)) /    # invert (and revert to 1-index)
         rep['note_n'] *                     # unit normalize
         rep['velocity_delta'] +             # scale
         note_velocity_range[0]              # offset
     )
     dur = int(
-        (rep['note_n'] - rep['note_i']) /   # invert
+        (rep['note_n'] - (note_i + 1)) /    # invert (and revert to 1-index)
         rep['note_n'] *                     # unit normalize
         rep['duration_delta'] +             # scale
         note_duration_range[0]              # offset
@@ -152,13 +161,13 @@ def station_to_midi(st):
     output_values = {
         'note':     rep['note_palette'][ note_i ], 
         'velocity': velocity, 
-        'note_dur': dur,
+        'note_dur': dur,                        # ms
 
         'cc':       '64',                       # fixed parameter
         'cc_val':   cc_val
     }
 
-    log.debug(output_values)
+    log.debug(f'\n{output_values}\n')
 
     return output_values
 
