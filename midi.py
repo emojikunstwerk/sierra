@@ -71,9 +71,15 @@ class NoteManager():
         self.device = device
         self.score  = {}
 
-    def sound_note(self, note, velocity, duration_s):
-        time_end = time.time() + duration_s
-        self.score[note] = time_end     # we may be updating the note-off time for an already-sounding note
+    def sound_note(self, note, velocity, duration_ms):
+        time_end = time.time() + (duration_ms / 1000)
+        
+        # only update the OFF time if it should be _extended_. This is a design
+        # choice, but conceivably there will be uses for which we'd want to
+        # shorten a note's life instead (will worry about that later).
+        if time_end > self.score[note]:
+            self.score[note] = time_end
+        
         self.device.on(note, velocity)
 
     def elapse_events(self, time_now = None):
