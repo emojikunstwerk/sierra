@@ -14,6 +14,7 @@ from midi import DeviceNotActive
 from midi import NoteManager
 from midi import mido
 import pandas as pd
+import numpy as np
 import time
 import logging
 import sys
@@ -85,16 +86,21 @@ def load_data():
         data = pd.read_csv("sierra-prep.csv")
 
 def make_map():
-    global rep 
+    global rep, data
 
     palette = make_note_palette()
 
+    data = data.assign(
+        water_log = np.log(data['water_mm_sum'] + 0.01)
+        # temp_log  = np.log(data['temp_c_med']   + 0.01)
+    )
+    
     rep = {
         'note_palette': palette,
         'note_n':       len(palette),
 
-        'water_min':    data['water_mm_sum'].min(),
-        'water_max':    data['water_mm_sum'].max(),
+        'water_min':    data['water_log'].min(),
+        'water_max':    data['water_log'].max(),
 
         'temp_min':     data['temp_c_med'].min(),
         'temp_max':     data['temp_c_med'].max()
@@ -135,13 +141,13 @@ def station_to_midi(st):
     # the nominal, direct maps
     note_i = int(
         (rep['water_delta'] -                           # invert
-            (st.water_mm_sum - rep['water_min']) ) /    # offset
+            (st.water_log - rep['water_min']) ) /       # offset
         rep['water_delta'] *                            # unit normalize
         rep['note_n'] - 1                               # expand (map to palette)
     )
 
     cc_val = int(
-        (st.temp_c_med - rep['temp_min']) /         # offset
+        (st.temp_c_med - rep['temp_min']) /          # offset
         rep['temp_delta'] *                         # unit normalize
         127                                         # expand (CC range)
     )
