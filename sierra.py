@@ -46,8 +46,8 @@ notes = {   # note @ lowest permitted octave (to simplify metric mapping)
 octave_step = 12        # notes per octave
 octave_range = [0, 5]   # data map should span these octaves
 
-note_duration_range = [750, 1000 * 15]    # ms
-note_velocity_range = [7, 127]
+note_duration_range = [750, 1000 * 15]      # ms
+note_velocity_range = [10, 127]             # note: Animoog has an additional range-scaling parameter (currently @ ~50%)
 
 year_range = [2014, 2019]
 
