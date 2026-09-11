@@ -37,7 +37,7 @@ cc_control          = 80        # which control element to link with temperature
 cc_range            = [0, 80]   # bound the control value range [note: > 80 == very high notes produce low artifacts & resonances]
 
 elev_rest           = 5         # ms, step time between feet of elevation
-section_rest        = 5000      # ms, rest time between sections
+section_rest        = 6000      # ms, rest time between sections
 start_elevation_ft  = 10100     # imaginary elevation at which playhead begins (= leading silence)
 
 notes = {   # note @ lowest permitted octave (to simplify metric mapping)
