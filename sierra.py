@@ -24,6 +24,8 @@ tammy = None    # mido device port will be stored here
 data  = None    # processed snotel data will be stored here
 rep   = None    # properties characterizing map from `data` to MIDI range, ie, the representation
 
+csv_default = 'sierra-prep.csv'     # if no particular data file is requested, load this one
+
 elev_rest           = 5         # ms, step time between feet of elevation
 section_rest        = 4000      # ms, rest time between sections
 start_elevation_ft  = 9500      # imaginary elevation at which playhead begins
@@ -44,7 +46,7 @@ note_velocity_range = [7, 127]
 year_range = [2014, 2019]
 
 
-def setup(debug = True, dev_name = None):
+def setup(csv_name = None, dev_name = None, debug = True):
     global log
 
     handler_console = logging.StreamHandler(sys.stdout)
@@ -61,7 +63,7 @@ def setup(debug = True, dev_name = None):
     log = logging.getLogger('sierra')
     log.info('\n\n\nNew session\n')
 
-    load_data()
+    load_data(csv_name)
     make_map()
     connect_tammy(dev_name)
 
@@ -79,11 +81,13 @@ def connect_tammy(dev_name = None):
     else:
         log.info("Tammy already connected.")
 
-def load_data():
+def load_data(csv_name):
     global data
 
-    if data is None:
-        data = pd.read_csv("sierra-prep.csv")
+    if csv_name is None:
+        csv_name = csv_default
+
+    data = pd.read_csv(csv_name)    # always load fresh (even if it may be the same version of the same file)
 
 def make_map():
     global rep, data
