@@ -24,7 +24,13 @@ tammy = None    # mido device port will be stored here
 data  = None    # processed snotel data will be stored here
 rep   = None    # properties characterizing map from `data` to MIDI range, ie, the representation
 
-csv_default = 'sierra-prep.csv'     # if no particular data file is requested, load this one
+
+# config ------
+
+csv_default = 'sierra-prep-elev.csv'    # if no particular data file is requested, load this one
+                                        # 'sierra-prep.csv', 'sierra-prep-elev.csv'
+
+map_mode_default = "log"                # log or linear (affects water data only)
 
 elev_rest           = 5         # ms, step time between feet of elevation
 section_rest        = 4000      # ms, rest time between sections
@@ -38,12 +44,14 @@ notes = {   # note @ lowest permitted octave (to simplify metric mapping)
     'A':    45 
 }
 octave_step = 12        # notes per octave
-octave_range = [0, 5]   # data map should span X octaves
+octave_range = [0, 5]   # data map should span these octaves
 
 note_duration_range = [750, 1000 * 15]    # ms
 note_velocity_range = [7, 127]
 
 year_range = [2014, 2019]
+
+
 
 
 def setup(csv_name = None, dev_name = None, debug = True):
@@ -81,7 +89,7 @@ def connect_tammy(dev_name = None):
     else:
         log.info("Tammy already connected.")
 
-def load_data(csv_name):
+def load_data(csv_name = None):
     global data
 
     if csv_name is None:
@@ -103,16 +111,22 @@ def make_map():
         'note_palette': palette,
         'note_i_max':   len(palette) - 1,
 
-        'water_min':    data['water_log'].min(),
-        'water_max':    data['water_log'].max(),
+        'water_min':    data['water_mm_sum'].min(),
+        'water_max':    data['water_mm_sum'].max(),
+
+        'water_log_min':    data['water_log'].min(),
+        'water_log_max':    data['water_log'].max(),
 
         'temp_min':     data['temp_c_med'].min(),
         'temp_max':     data['temp_c_med'].max()
     }
 
     rep.update({
-        'water_delta':      rep['water_max'] - rep['water_min'],
+        'water_delta':      rep['water_max']     - rep['water_min'],
+        'water_log_delta':  rep['water_log_max'] - rep['water_log_min'],
+
         'temp_delta':       rep['temp_max']  - rep['temp_min'],
+
         'duration_delta':   note_duration_range[1] - note_duration_range[0],
         'velocity_delta':   note_velocity_range[1] - note_velocity_range[0]
     })
@@ -134,27 +148,43 @@ def make_note_palette():
 
     return palette
 
-def station_to_midi(st):
+class UnrecognizedMap(Exception): pass
+
+def station_to_midi(st, map_mode = None):
     """ 
     the logic to map the observation values to synthesizer parameters.
     this is arbitrary, experimental, expressing, and the entire point.
     """
     log.debug(f'\n{st}')
 
+    if map_mode is None:
+        map_mode = map_mode_default
+
 
     # the nominal, direct maps
-    note_i = int(
-        (rep['water_delta'] -                           # invert
-            (st.water_log - rep['water_min']) ) /       # offset
-        rep['water_delta'] *                            # unit normalize
-        rep['note_i_max']                               # expand (map to palette)
-    )
-    
+    if (map_mode == "log"):
+        note_i = int(
+            (rep['water_log_delta'] -                       # invert
+                (st.water_log - rep['water_log_min']) ) /   # offset
+            rep['water_log_delta'] *                        # unit normalize
+            rep['note_i_max']                               # expand (map to palette)
+        )
+    elif (map_mode == "linear"):
+        note_i = int(
+            (rep['water_delta'] -                           # invert
+                (st.water_mm_sum - rep['water_min']) ) /    # offset
+            rep['water_delta'] *                            # unit normalize
+            rep['note_i_max']                               # expand (map to palette)
+        )
+    else:
+        raise UnrecognizedMap
+        
     cc_val = int(
         (st.temp_c_med - rep['temp_min']) /         # offset
         rep['temp_delta'] *                         # unit normalize
         127                                         # expand (CC range)
     )
+
 
     # correlate other sounding properties to the note
     velocity = int(
@@ -184,7 +214,10 @@ def station_to_midi(st):
 
     return output_values
 
-def start(longitude_group, elev_rest = elev_rest):
+def start(longitude_group, elev_rest = elev_rest, map_mode = None):
+
+    if map_mode is None:
+        map_mode = map_mode_default
 
     score = NoteManager("sierra", tammy)
 
@@ -211,7 +244,7 @@ def start(longitude_group, elev_rest = elev_rest):
             if (next_station_i <= (section_n - 1) and 
                 section.iloc[next_station_i].elevation_ft >= elev_playhead):
                 
-                ev = station_to_midi( section.iloc[next_station_i] )
+                ev = station_to_midi( section.iloc[next_station_i], map_mode )
                 # do CC stuff
                 score.sound_note(ev['note'], ev['velocity'], ev['note_dur'])
 
