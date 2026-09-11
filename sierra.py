@@ -103,8 +103,8 @@ def make_map():
     palette = make_note_palette()
 
     data = data.assign(
-        water_log = np.log(data['water_mm_sum'] + 0.01)
-        # temp_log  = np.log(data['temp_c_med']   + 0.01)
+        water_log = np.log(data['water_mm_sum'] + 0.01),
+        temp_c    = data['temp_c_max']      # pick one temp stat to be THE temp metric in the score
     )
     
     rep = {
@@ -117,8 +117,8 @@ def make_map():
         'water_log_min':    data['water_log'].min(),
         'water_log_max':    data['water_log'].max(),
 
-        'temp_min':     data['temp_c_med'].min(),
-        'temp_max':     data['temp_c_med'].max()
+        'temp_min':     data['temp_c'].min(),
+        'temp_max':     data['temp_c'].max()
     }
 
     rep.update({
@@ -180,9 +180,9 @@ def station_to_midi(st, map_mode = None):
         raise UnrecognizedMap
         
     cc_val = int(
-        (st.temp_c_med - rep['temp_min']) /         # offset
-        rep['temp_delta'] *                         # unit normalize
-        127                                         # expand (CC range)
+        (st.temp_c - rep['temp_min']) /     # offset
+        rep['temp_delta'] *                 # unit normalize
+        127                                 # expand (CC range)
     )
 
 
