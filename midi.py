@@ -107,5 +107,6 @@ class NoteManager():
 
         for note in self.score.keys():
             self.device.off(note)
-            del self.score[note]
             time.sleep(msg_breather_s)
+
+        self.score = {}
