@@ -29,14 +29,16 @@ rep   = None    # properties characterizing map from `data` to MIDI range, ie, t
 
 csv_default = 'sierra-prep-elev.csv'    # if no particular data file is requested, load this one
                                         # 'sierra-prep.csv', 'sierra-prep-elev.csv'
+year_range = [2014, 2019]
 
 map_mode_default = "linear"             # log or linear (affects water data only)
 
-cc_control          = 80        # which control element to link with temp metric
+cc_control          = 80        # which control element to link with temperature metric
+cc_range            = [0, 80]   # bound the control value range [note: > 80 == very high notes produce low artifacts & resonances]
 
 elev_rest           = 5         # ms, step time between feet of elevation
-section_rest        = 4000      # ms, rest time between sections
-start_elevation_ft  = 9500      # imaginary elevation at which playhead begins
+section_rest        = 5000      # ms, rest time between sections
+start_elevation_ft  = 10100     # imaginary elevation at which playhead begins (= leading silence)
 
 notes = {   # note @ lowest permitted octave (to simplify metric mapping)
     'C':    36,
@@ -48,10 +50,9 @@ notes = {   # note @ lowest permitted octave (to simplify metric mapping)
 octave_step = 12        # notes per octave
 octave_range = [0, 5]   # data map should span these octaves
 
-note_duration_range = [750, 1000 * 15]      # ms
+note_duration_range = [750, 15_000]         # ms
 note_velocity_range = [10, 127]             # note: Animoog has an additional range-scaling parameter (currently @ ~50%)
 
-year_range = [2014, 2019]
 
 
 
@@ -130,7 +131,8 @@ def make_map():
         'temp_delta':       rep['temp_max']  - rep['temp_min'],
 
         'duration_delta':   note_duration_range[1] - note_duration_range[0],
-        'velocity_delta':   note_velocity_range[1] - note_velocity_range[0]
+        'velocity_delta':   note_velocity_range[1] - note_velocity_range[0],
+        'control_delta':    cc_range[1] - cc_range[0]
     })
 
 def make_note_palette():
@@ -184,7 +186,8 @@ def station_to_midi(st, map_mode = None):
     cc_val = int(
         (st.temp_c - rep['temp_min']) /     # offset
         rep['temp_delta'] *                 # unit normalize
-        127                                 # expand (CC range)
+        rep['control_delta'] +              # expand (CC range)
+        cc_range[0]                         # offset
     )
 
 
