@@ -1,20 +1,28 @@
 # r-pm/
 
-# - (station, year)
-    # sum water     [ 13 of 54 stations lack all 60 (12x5) measurements ]
-    # median temp   [ med. of station_med_dist (all years) is 3.5C (!) ]
-# - (long, elevation) bin
-    # max sum_water
-    # mean temp
-# - recompute longitude_groups (? high-elev toward middle groups, retain low elev. in rightmost)
-# - normalized version of water_mm (log?)
+dir = "/Users/ryan/Documents/Projects/radio\ histogram/sierra/code/"
+in_csv_f  = "sierra-observations.csv"
 
 
-in_csv_path  = "/Users/ryan/Documents/Projects/radio\ histogram/sierra/sierra-observations.csv"
-out_csv_path = "/Users/ryan/Documents/Projects/radio\ histogram/sierra/sierra-prep.csv"
+# note that the different output file variants to have slightly differing schema
+
+# summed by station
+run = function(out_csv_f = "sierra-prep.csv") {
+    in_csv  = load()
+    out_csv = preprocess(in_csv)
+    write_csv(out_csv, str_glue("{dir}{out_csv_f}"))
+}
+
+# summed by elevation bin
+run_elev = function(out_csv_f = "sierra-prep-elev.csv") {
+    in_csv  = load()
+    out_csv = elev_summ(in_csv)
+    write_csv(out_csv, str_glue("{dir}{out_csv_f}"))
+
+}
 
 load = function() {
-    return( read_csv(in_csv_path) )
+    return( read_csv(str_glue("{dir}{in_csv_f}")) )
 }
 
 preprocess = function(in_csv) {
@@ -53,24 +61,40 @@ preprocess = function(in_csv) {
                 breaks = quantile(longitude, probs = seq(0, 1, 0.25)),
                 labels = FALSE  # integer names (DESCENDING from east-to-west)
             )
-
-            # for exploration, not score
-            # elevation_group = cut(
-            #     elevation_ft,
-            #     include.lowest = TRUE,
-            #     breaks = 18,    # arbitrary, eyeballed interesting
-            #     labels = FALSE  # integer names (DESCENDING from high-to-low)
-            # )
         ) |>
         arrange(year, desc(elevation_ft))
 
     return(out_csv)
 }
 
-run = function() {
-    in_csv  = load()
-    out_csv = preprocess(in_csv)
-    write_csv(out_csv, out_csv_path)
+elev_summ = function(in_csv) {
+
+    out_csv = preprocess(in_csv) |>
+        mutate(
+            elevation_group = cut(
+                elevation_ft,
+                include.lowest = TRUE,
+                breaks = 18,    # arbitrary, eyeballed interesting
+                labels = FALSE  # integer names (DESCENDING from high-to-low)
+            )
+        ) |>
+        group_by(year, longitude_group, elevation_group) |>
+        summarize(
+            water_mm_sum  = sum(water_mm_sum),
+            temp_c_mu     = mean(temp_c_med),
+            temp_c_max    = max(temp_c_max),
+            elevation_ft  = max(elevation_ft)   # score "clock" triggers a bin @ upper bound elev
+        ) |>
+        ungroup() |>
+        arrange(year, desc(elevation_group))
+
+    return(out_csv)
 }
 
-# ggplot(d1, aes(water_mm_sum, elevation_ft)) + geom_point(aes(alpha = 0.3, size = water_mm_sum, color = temp_c_max)) + facet_grid(cols = vars(longitude_group), rows = vars(year))
+plot_stash = function() {
+    ggplot(d1, aes(water_mm_sum, elevation_ft)) + geom_point(aes(alpha = 0.3, size = water_mm_sum, color = temp_c_max)) + facet_grid(cols = vars(longitude_group), rows = vars(year))
+    
+    ggplot(dg, aes(water_mm_sum, as.numeric(elevation_group))) + geom_point(aes(alpha = 0.3, size = water_mm_sum, color = temp_c_max)) + facet_grid(cols = vars(longitude_group), rows = vars(year))
+    
+    ggplot(dg, aes(water_mm_sum, as.numeric(elevation_group))) + geom_point(aes(alpha = 0.3, size = water_mm_sum, color = temp_c_max)) + facet_grid(cols = vars(longitude_group), rows = vars(year)) + scale_x_log(labels = comma)
+}
