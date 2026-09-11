@@ -97,7 +97,7 @@ def make_map():
     
     rep = {
         'note_palette': palette,
-        'note_n':       len(palette),
+        'note_i_max':   len(palette) - 1,
 
         'water_min':    data['water_log'].min(),
         'water_max':    data['water_log'].max(),
@@ -143,25 +143,25 @@ def station_to_midi(st):
         (rep['water_delta'] -                           # invert
             (st.water_log - rep['water_min']) ) /       # offset
         rep['water_delta'] *                            # unit normalize
-        rep['note_n'] - 1                               # expand (map to palette)
+        rep['note_i_max']                               # expand (map to palette)
     )
-
+    
     cc_val = int(
-        (st.temp_c_med - rep['temp_min']) /          # offset
+        (st.temp_c_med - rep['temp_min']) /         # offset
         rep['temp_delta'] *                         # unit normalize
         127                                         # expand (CC range)
     )
 
     # correlate other sounding properties to the note
     velocity = int(
-        (rep['note_n'] - (note_i + 1)) /    # invert (and revert to 1-index)
-        rep['note_n'] *                     # unit normalize
+        (rep['note_i_max'] - note_i) /      # invert
+        rep['note_i_max'] *                 # unit normalize
         rep['velocity_delta'] +             # scale
         note_velocity_range[0]              # offset
     )
     dur = int(
-        (rep['note_n'] - (note_i + 1)) /    # invert (and revert to 1-index)
-        rep['note_n'] *                     # unit normalize
+        (rep['note_i_max'] - note_i) /      # invert
+        rep['note_i_max'] *                 # unit normalize
         rep['duration_delta'] +             # scale
         note_duration_range[0]              # offset
     )
@@ -187,7 +187,7 @@ def start(longitude_group, elev_rest = elev_rest):
     voice_data = data.query(f'longitude_group == {longitude_group}')
     log.info(f'Loaded longitude_group {longitude_group} ({len(voice_data)} obs)')
 
-    for year in range(year_range[0], year_range[1], 1):
+    for year in range(year_range[0], year_range[1] + 1, 1):
 
         section = voice_data.query(f'year == {year}')
         section_n = len(section)
