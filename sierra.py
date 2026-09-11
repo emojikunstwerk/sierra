@@ -30,7 +30,9 @@ rep   = None    # properties characterizing map from `data` to MIDI range, ie, t
 csv_default = 'sierra-prep-elev.csv'    # if no particular data file is requested, load this one
                                         # 'sierra-prep.csv', 'sierra-prep-elev.csv'
 
-map_mode_default = "log"                # log or linear (affects water data only)
+map_mode_default = "linear"             # log or linear (affects water data only)
+
+cc_control          = 80        # which control element to link with temp metric
 
 elev_rest           = 5         # ms, step time between feet of elevation
 section_rest        = 4000      # ms, rest time between sections
@@ -206,7 +208,7 @@ def station_to_midi(st, map_mode = None):
         'velocity': velocity, 
         'note_dur': dur,                        # ms
 
-        'cc':       '64',                       # fixed parameter
+        'cc':       cc_control,                 # fixed parameter, but future-flexible
         'cc_val':   cc_val
     }
 
@@ -245,7 +247,7 @@ def start(longitude_group, elev_rest = elev_rest, map_mode = None):
                 section.iloc[next_station_i].elevation_ft >= elev_playhead):
                 
                 ev = station_to_midi( section.iloc[next_station_i], map_mode )
-                # do CC stuff
+                tammy.cc(ev['cc'], ev['cc_val'])
                 score.sound_note(ev['note'], ev['velocity'], ev['note_dur'])
 
                 next_station_i = next_station_i + 1

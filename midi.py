@@ -59,6 +59,9 @@ class Device():
             time.sleep(msg_breather_s)
             log.debug(f"killed note {str(note)}")
 
+    def cc(self, control, value):
+        self.port.send(mido.Message('control_change', control = control, value = value))
+
 class NoteManager():
     """
     a very simple abstraction for keeping track of how long notes should
