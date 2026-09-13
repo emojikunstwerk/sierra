@@ -19,6 +19,7 @@ class Device():
     def __init__(self, name):
         self.port   = None
         self.active = []        # running set of ON notes
+        self.name = name
 
         self._connect(name)
         atexit.register(self.disconnect)     # guarantee connection is closed (on session exit)
@@ -32,6 +33,9 @@ class Device():
             raise DeviceNotActive
 
     def disconnect(self):
+        if len(self.active) > 0:
+            log.warn(f'notes still active, disconnecting from {self.name} w/ panic')
+            self.panic()
         self.port.close()   # (noop if already closed)
 
     def on(self, note, velocity = 64):    # 0-127; Animoog is weird: C2 = 60

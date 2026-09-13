@@ -36,7 +36,7 @@ map_mode_default = "linear"             # log or linear (affects water data only
 cc_control          = 80        # which control element to link with temperature metric
 cc_range            = [0, 80]   # bound the control value range [note: > 80 == very high notes produce low artifacts & resonances]
 
-elev_rest           = 5         # ms, step time between feet of elevation
+elev_rest           = 3         # ms, step time between feet of elevation
 section_rest        = 6000      # ms, rest time between sections
 start_elevation_ft  = 10100     # imaginary elevation at which playhead begins (= leading silence)
 
@@ -91,6 +91,10 @@ def connect_tammy(dev_name = None):
             log.warning(f"Tammy not active (as \'{dev_name}\'). Try again: mido.get_output_names() / connect_tammy(\'new name\')")
     else:
         log.info("Tammy already connected.")
+
+def interrupt_cleanup():
+    if tammy is not None:
+        tammy.panic()
 
 def load_data(csv_name = None):
     global data
@@ -220,6 +224,12 @@ def station_to_midi(st, map_mode = None):
     return output_values
 
 def start(longitude_group, elev_rest = elev_rest, map_mode = None):
+    try:
+        play_group(longitude_group, elev_rest, map_mode)
+    except KeyboardInterrupt:
+        interrupt_cleanup()
+
+def play_group(longitude_group, elev_rest, map_mode):
 
     if map_mode is None:
         map_mode = map_mode_default
