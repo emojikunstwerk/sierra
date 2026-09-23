@@ -20,27 +20,29 @@ import logging
 import sys
 
 log   = None    # log instance 
-tammy = None    # mido device port will be stored here
+tammy = None    # mido device port will be stored here. var name vestigial but treasured.
 data  = None    # processed snotel data will be stored here
 rep   = None    # properties characterizing map from `data` to MIDI range, ie, the representation
 
 
 # config ------
 
+dev_default = 'OP-1 Midi Device'        # 'Tammy Squared Bluetooth', 'iPad Bluetooth', 'OP-1 Midi Device'
+
 csv_default = 'sierra-prep-elev.csv'    # if no particular data file is requested, load this one
                                         # 'sierra-prep.csv', 'sierra-prep-elev.csv'
 year_range = [2014, 2019]
 
-map_mode_default = "linear"             # log or linear (affects water data only)
+map_mode_default = "log"                # log or linear (affects water data only)
 
-cc_control          = 80        # which control element to link with temperature metric
-cc_range            = [0, 80]   # bound the control value range [note: > 80 == very high notes produce low artifacts & resonances]
-
-elev_rest           = 3         # ms, step time between feet of elevation
-section_rest        = 6000      # ms, rest time between sections
+elev_rest           = 2         # ms, step time between feet of elevation
+section_rest        = 13_000    # ms, rest time between sections
 start_elevation_ft  = 10100     # imaginary elevation at which playhead begins (= leading silence)
 
-notes = {   # note @ lowest permitted octave (to simplify metric mapping)
+cc_control          = 1         # which control element to link with temperature metric
+cc_range            = [0, 80]   # bound the control value range [note: > 80 == very high notes produce low artifacts & resonances (animoog)]
+
+notes = {   # note @ lowest permitted octave (to simplify metric mapping); Animoog is weird: C2 = 60
     'C':    36,
     'D':    38,
     'F':    41,
@@ -48,13 +50,10 @@ notes = {   # note @ lowest permitted octave (to simplify metric mapping)
     'A':    45 
 }
 octave_step = 12        # notes per octave
-octave_range = [0, 5]   # data map should span these octaves
+octave_range = [0, 3]   # data map should span these octaves
 
-note_duration_range = [750, 15_000]         # ms
-note_velocity_range = [10, 127]             # note: Animoog has an additional range-scaling parameter (currently @ ~50%)
-
-
-
+note_duration_range = [2000, 25_000]        # ms
+note_velocity_range = [15, 127]             # note: Animoog has an additional range-scaling parameter (currently @ ~50%) [OP-1 doesn't utilize velocity]
 
 
 def setup(csv_name = None, dev_name = None, debug = True):
@@ -82,15 +81,15 @@ def connect_tammy(dev_name = None):
     global tammy
     
     if dev_name is None:
-        dev_name = 'Tammy Squared Bluetooth'
+        dev_name = dev_default
     if tammy is None:
         try:
             tammy = Device(dev_name)
-            log.info(f'Tammy connected as {dev_name}.')
+            log.info(f'MIDI device {dev_name} connected.')
         except DeviceNotActive:
-            log.warning(f"Tammy not active (as \'{dev_name}\'). Try again: mido.get_output_names() / connect_tammy(\'new name\')")
+            log.warning(f"MIDI device \'{dev_name}\' not active. Try again: mido.get_output_names() / connect_tammy(\'new name\')")
     else:
-        log.info("Tammy already connected.")
+        log.info(f'Device {tammy.name} already connected.')
 
 def interrupt_cleanup():
     if tammy is not None:
