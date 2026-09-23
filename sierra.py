@@ -35,7 +35,7 @@ year_range = [2014, 2019]
 
 map_mode_default = "log"                # log or linear (affects water data only)
 
-elev_rest           = 2         # ms, step time between feet of elevation
+elev_rest           = 4         # ms, step time between feet of elevation
 section_rest        = 13_000    # ms, rest time between sections
 start_elevation_ft  = 10100     # imaginary elevation at which playhead begins (= leading silence)
 
