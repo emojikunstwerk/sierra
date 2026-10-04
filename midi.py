@@ -10,11 +10,28 @@ log = logging.getLogger('midi')
 
 msg_breather_s = 0.05       # throttle messages sent at the "same" time
 
-
+class NoDeviceActive(Exception): pass
 class DeviceNotActive(Exception): pass
 
 class Device():
     """ Known device names: 'Tammy Squared Bluetooth', 'iPad Bluetooth', 'OP-1 Midi Device' """
+
+    @classmethod
+    def list_devices(cls):
+        return mido.get_output_names()
+
+    @classmethod
+    def first_device(cls):
+        """
+        From the list of all currently-connected devices, return just the
+        first. This is handy for quick-connect scenarios in which only one
+        device is ever expected to be connected at a time
+        """
+        dev_names = mido.get_output_names()
+        if len(dev_names) > 0:
+            return dev_names[0]
+        else:
+            raise NoDeviceActive
 
     def __init__(self, name):
         self.port   = None

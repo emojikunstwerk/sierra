@@ -11,6 +11,7 @@ python -i sierra.py
 
 from midi import Device
 from midi import DeviceNotActive
+from midi import NoDeviceActive
 from midi import NoteManager
 from midi import mido
 import pandas as pd
@@ -27,7 +28,7 @@ rep   = None    # properties characterizing map from `data` to MIDI range, ie, t
 
 # config ------
 
-dev_default = 'iPad Bluetooth'          # 'Tammy Squared Bluetooth', 'iPad Bluetooth', 'OP-1 Midi Device'
+dev_names = ('Tammy Squared Bluetooth', 'iPad Bluetooth', 'OP-1 Midi Device')
 
 csv_default = 'sierra-prep-elev.csv'    # if no particular data file is requested, load this one
                                         # 'sierra-prep.csv', 'sierra-prep-elev.csv'
@@ -56,7 +57,7 @@ note_duration_range = [2000, 25_000]        # ms
 note_velocity_range = [15, 127]             # note: Animoog has an additional range-scaling parameter (currently @ ~50%) [OP-1 doesn't utilize velocity]
 
 
-def setup(csv_name = None, dev_name = None, debug = True):
+def setup(csv_name = None, debug = True):
     global log
 
     handler_console = logging.StreamHandler(sys.stdout)
@@ -75,19 +76,20 @@ def setup(csv_name = None, dev_name = None, debug = True):
 
     load_data(csv_name)
     make_map()
-    connect_tammy(dev_name)
+    connect_tammy()
 
-def connect_tammy(dev_name = None):
+def connect_tammy():
     global tammy
     
-    if dev_name is None:
-        dev_name = dev_default
     if tammy is None:
         try:
+            dev_name = Device.first_device()
             tammy = Device(dev_name)
             log.info(f'MIDI device {dev_name} connected.')
         except DeviceNotActive:
-            log.warning(f"MIDI device \'{dev_name}\' not active. Try again: mido.get_output_names() / connect_tammy(\'new name\')")
+            log.warning(f"MIDI device \'{dev_name}\' not active.")
+        except NoDeviceActive:
+            log.warning(f"No MIDI devices currently active.")
     else:
         log.info(f'Device {tammy.name} already connected.')
 
@@ -273,5 +275,5 @@ def play_group(longitude_group, elev_rest, map_mode):
 
     log.info(f'Completed run (longitude_group {longitude_group})')
 
-# setup()
-print('Call setup() [sierra.log debug mode on by default], then start(longitude_group)')
+setup()
+print('To run, call start(longitude_group = X)')
