@@ -1,5 +1,5 @@
 """
-conda create -n sierra pandas python=3.14
+conda create -n sierra pandas python=3.14 python-gil
 conda activate sierra
 python3 -m pip install mido
 python3 -m pip install python-rtmidi
@@ -27,7 +27,7 @@ rep   = None    # properties characterizing map from `data` to MIDI range, ie, t
 
 # config ------
 
-dev_default = 'OP-1 Midi Device'        # 'Tammy Squared Bluetooth', 'iPad Bluetooth', 'OP-1 Midi Device'
+dev_default = 'iPad Bluetooth'          # 'Tammy Squared Bluetooth', 'iPad Bluetooth', 'OP-1 Midi Device'
 
 csv_default = 'sierra-prep-elev.csv'    # if no particular data file is requested, load this one
                                         # 'sierra-prep.csv', 'sierra-prep-elev.csv'
@@ -39,7 +39,7 @@ elev_rest           = 4         # ms, step time between feet of elevation
 section_rest        = 13_000    # ms, rest time between sections
 start_elevation_ft  = 10100     # imaginary elevation at which playhead begins (= leading silence)
 
-cc_control          = 1         # which control element to link with temperature metric
+cc_control          = 80        # which control element to link with temperature metric (Animoog: 80; OP-1: 1, but unused)
 cc_range            = [0, 80]   # bound the control value range [note: > 80 == very high notes produce low artifacts & resonances (animoog)]
 
 notes = {   # note @ lowest permitted octave (to simplify metric mapping); Animoog is weird: C2 = 60
