@@ -49,8 +49,6 @@ notes = {   # note @ lowest permitted octave (to simplify metric mapping); Animo
 }
 octave_step = 12        # notes per octave
 octave_range = [0, 4]   # data map should span these octaves
-octave_alpha = 1        # scaling constant      # what was sposda be "octave_"-y about the "power-nonsense" map? (i forget)
-octave_power = -2       # exponent
 
 note_duration_range = [3000, 10_000]         # ms
 note_velocity_range = [15, 127]             # note: Animoog has an additional range-scaling parameter (currently @ ~50%) [OP-1 doesn't utilize velocity]
@@ -105,7 +103,11 @@ def load_data(csv_name = None):
     if csv_name is None:
         csv_name = csv_default
 
-    data = pd.read_csv(csv_name)    # always load fresh (even if it may be the same version of the same file)
+    # always load fresh (even if it may be the same version of the same file)
+    data = pd.read_csv(
+        csv_name,
+        dtype = { "water_mm_sum": float }   # convert here (before float-dependent math later)
+    )
 
 def make_map():
     global rep, data
@@ -129,8 +131,8 @@ def make_map():
         'water_log_min':    data['water_log'].min(),
         'water_log_max':    data['water_log'].max(),
 
-        'water_power_min':    data['water_power'].min(),
-        'water_power_max':    data['water_power'].max(),
+        'water_pwr_min':    data['water_pwr'].min(),
+        'water_pwr_max':    data['water_pwr'].max(),
 
         'temp_min':     data['temp_c'].min(),
         'temp_max':     data['temp_c'].max()
@@ -147,6 +149,27 @@ def make_map():
         'velocity_delta':   note_velocity_range[1] - note_velocity_range[0],
         'control_delta':    cc_range[1] - cc_range[0]
     })
+
+    data['linear_note_i'] = pd.to_numeric(
+        (rep['water_delta'] -                               # invert
+            (data.water_mm_sum - rep['water_min']) ) /      # offset
+        rep['water_delta'] *                                # unit normalize
+        rep['note_i_max']                                   # expand (map to palette)
+    )
+
+    data['log_note_i'] = pd.to_numeric(
+        (rep['water_log_delta'] -                           # invert
+            (data.water_log - rep['water_log_min']) ) /     # offset
+        rep['water_log_delta'] *                            # unit normalize
+        rep['note_i_max']                                   # expand (map to palette)
+    )
+
+    data['pwr_note_i'] = pd.to_numeric(
+        (rep['water_pwr_delta'] -                           # invert
+            (data.water_pwr - rep['water_pwr_min']) ) /     # offset
+        rep['water_pwr_delta'] *                            # unit normalize
+        rep['note_i_max']                                   # expand (map to palette)
+    )
 
 def make_note_palette():
     """
@@ -178,40 +201,20 @@ def station_to_midi(st, map_mode = None):
         map_mode = map_mode_default
 
 
-    # the nominal, direct maps
+    # chose the note mapping
     if (map_mode == "log"):
-        note_i = int(
-            (rep['water_log_delta'] -                       # invert
-                (st.water_log - rep['water_log_min']) ) /   # offset
-            rep['water_log_delta'] *                        # unit normalize
-            rep['note_i_max']                               # expand (map to palette)
-        )
+        note_i = st.log_note_i
+
     elif (map_mode == "linear"):
-        note_i = int(
-            (rep['water_delta'] -                           # invert
-                (st.water_mm_sum - rep['water_min']) ) /    # offset
-            rep['water_delta'] *                            # unit normalize
-            rep['note_i_max']                               # expand (map to palette)
-        )
-    elif (map_mode == 'power-nonsense'):
-        w = (
-            (rep['water_delta'] -                           # invert
-                (st.water_mm_sum - rep['water_min']) ) /    # offset
-            rep['water_delta']                              # unit normalize
-        )
-        note_i = int(octave_alpha * (w ** octave_power))
-        # BS: transform has to happen _before_ the scaling/map (a la `log`)
+        note_i = st.linear_note_i
 
     elif (map_mode == 'power'):
-        note_i = int(
-            (rep['water_pwr_delta'] -                       # invert
-                (st.water_pwr - rep['water_pwr_min']) ) /   # offset
-            rep['water_pwr_delta'] *                        # unit normalize
-            rep['note_i_max']                               # expand (map to palette)
-        )
+        note_i = st.pwr_note_i
+
     else:
         raise UnrecognizedMap
         
+
     cc_val = int(
         (st.temp_c - rep['temp_min']) /     # offset
         rep['temp_delta'] *                 # unit normalize
@@ -280,6 +283,9 @@ def play_group(longitude_group, elev_rest, map_mode):
 
         for elev_playhead in range(start_elevation_ft, 0, -1):
             # log.debug(f'elev_playhead: {elev_playhead}')
+
+            # note: depending on the input file, "station" might mean "elevation_group",
+            # which has already been implicitly summarized
 
             if (next_station_i <= (section_n - 1) and 
                 section.iloc[next_station_i].elevation_ft >= elev_playhead):
