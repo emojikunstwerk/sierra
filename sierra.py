@@ -27,17 +27,14 @@ rep   = None    # properties characterizing map from `data` to MIDI range, ie, t
 
 
 # config ------
-
-dev_names = ('Tammy Squared Bluetooth', 'iPad Bluetooth', 'OP-1 Midi Device')
-
 csv_default = 'sierra-prep-elev.csv'    # if no particular data file is requested, load this one
                                         # 'sierra-prep.csv', 'sierra-prep-elev.csv'
 year_range = [2014, 2019]
 
-map_mode_default = "log"                # log or linear (affects water data only)
+map_mode_default = "log"                # log, linear, power (affects water data only)
 
 elev_rest           = 4         # ms, step time between feet of elevation
-section_rest        = 13_000    # ms, rest time between sections
+section_rest        = 3000      # ms, rest time between sections
 start_elevation_ft  = 10100     # imaginary elevation at which playhead begins (= leading silence)
 
 cc_control          = 80        # which control element to link with temperature metric (Animoog: 80; OP-1: 1, but unused)
@@ -51,10 +48,15 @@ notes = {   # note @ lowest permitted octave (to simplify metric mapping); Animo
     'A':    45 
 }
 octave_step = 12        # notes per octave
-octave_range = [0, 3]   # data map should span these octaves
+octave_range = [0, 4]   # data map should span these octaves
+octave_alpha = 1        # scaling constant      # what was sposda be "octave_"-y about the "power-nonsense" map? (i forget)
+octave_power = -2       # exponent
 
-note_duration_range = [2000, 25_000]        # ms
+note_duration_range = [3000, 10_000]         # ms
 note_velocity_range = [15, 127]             # note: Animoog has an additional range-scaling parameter (currently @ ~50%) [OP-1 doesn't utilize velocity]
+
+map_alpha = 1        # scaling constant
+map_power = -2       # exponent
 
 
 def setup(csv_name = None, debug = True):
@@ -112,6 +114,8 @@ def make_map():
 
     data = data.assign(
         water_log = np.log(data['water_mm_sum'] + 0.01),
+        water_pwr = map_alpha * (data['water_mm_sum'] ** map_power),
+
         temp_c    = data['temp_c_max']      # pick one temp stat to be THE temp metric in the score
     )
     
@@ -125,6 +129,9 @@ def make_map():
         'water_log_min':    data['water_log'].min(),
         'water_log_max':    data['water_log'].max(),
 
+        'water_power_min':    data['water_power'].min(),
+        'water_power_max':    data['water_power'].max(),
+
         'temp_min':     data['temp_c'].min(),
         'temp_max':     data['temp_c'].max()
     }
@@ -132,6 +139,7 @@ def make_map():
     rep.update({
         'water_delta':      rep['water_max']     - rep['water_min'],
         'water_log_delta':  rep['water_log_max'] - rep['water_log_min'],
+        'water_pwr_delta':  rep['water_pwr_max'] - rep['water_pwr_min'],
 
         'temp_delta':       rep['temp_max']  - rep['temp_min'],
 
@@ -142,7 +150,7 @@ def make_map():
 
 def make_note_palette():
     """
-    the scale is arbitrary, and the octave range is constrainted. this
+    the scale is arbitrary, and the octave range is constrained. this
     function pre-generates an ordered set of allowed notes, the indexes
     of which are the targets of a data column map
     """
@@ -183,6 +191,22 @@ def station_to_midi(st, map_mode = None):
             (rep['water_delta'] -                           # invert
                 (st.water_mm_sum - rep['water_min']) ) /    # offset
             rep['water_delta'] *                            # unit normalize
+            rep['note_i_max']                               # expand (map to palette)
+        )
+    elif (map_mode == 'power-nonsense'):
+        w = (
+            (rep['water_delta'] -                           # invert
+                (st.water_mm_sum - rep['water_min']) ) /    # offset
+            rep['water_delta']                              # unit normalize
+        )
+        note_i = int(octave_alpha * (w ** octave_power))
+        # BS: transform has to happen _before_ the scaling/map (a la `log`)
+
+    elif (map_mode == 'power'):
+        note_i = int(
+            (rep['water_pwr_delta'] -                       # invert
+                (st.water_pwr - rep['water_pwr_min']) ) /   # offset
+            rep['water_pwr_delta'] *                        # unit normalize
             rep['note_i_max']                               # expand (map to palette)
         )
     else:
